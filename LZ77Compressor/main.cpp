@@ -15,35 +15,14 @@
 #include "CompressorWorker.h"
 #include "DecompressWorker.h"
 
-int main(int argc, char *argv[]) {
-    QApplication app(argc, argv);
-
-    QWidget window;
-    window.setWindowTitle("LZ77 Compressor/Decompressor");
-    window.resize(700, 1000); // Set window size
-
-    // Set a purple accent color
-    app.setStyleSheet(
-        "QPushButton { background-color: #8A2BE2; color: white; font-size: 16px; }"
-        "QPushButton:disabled { background-color: #CCCCCC; }"
-        "QLabel { font-size: 14px; }"
-        "QLineEdit { font-size: 14px; }"
-        "QProgressBar { height: 20px; }"
-        );
-
-    // Set custom icon
-    window.setWindowIcon(QIcon(":/resources/icon.png")); // Ensure you have an icon at this path
-
-    // Declare compressButton and decompressButton before using them
-    QPushButton *compressButton = new QPushButton("Compress");
-    QPushButton *decompressButton = new QPushButton("Decompress");
-
-    // Operation selection (Compress or Decompress)
+// Function to create radio button layouts
+QHBoxLayout* createOperationLayout(QButtonGroup* &operationButtonGroup, QRadioButton* &compressRadioButton, QRadioButton* &decompressRadioButton) {
     QLabel *operationLabel = new QLabel("Operation:");
-    QRadioButton *compressRadioButton = new QRadioButton("Compress");
-    QRadioButton *decompressRadioButton = new QRadioButton("Decompress");
+    compressRadioButton = new QRadioButton("Compress");
+    decompressRadioButton = new QRadioButton("Decompress");
     compressRadioButton->setChecked(true); // Default to Compress mode
-    QButtonGroup *operationButtonGroup = new QButtonGroup();
+
+    operationButtonGroup = new QButtonGroup();
     operationButtonGroup->addButton(compressRadioButton);
     operationButtonGroup->addButton(decompressRadioButton);
 
@@ -52,15 +31,21 @@ int main(int argc, char *argv[]) {
     operationLayout->addWidget(compressRadioButton);
     operationLayout->addWidget(decompressRadioButton);
 
-    // Mode selection (File or Folder) - Only visible in Compression mode
+    return operationLayout;
+}
+
+// Function to create mode selection layout
+QWidget* createModeWidget(QButtonGroup* &modeButtonGroup, QRadioButton* &fileRadioButton, QRadioButton* &folderRadioButton) {
     QWidget *modeWidget = new QWidget();
     QHBoxLayout *modeLayout = new QHBoxLayout(modeWidget);
     modeLayout->setContentsMargins(0, 0, 0, 0);
+
     QLabel *modeLabel = new QLabel("Mode:");
-    QRadioButton *fileRadioButton = new QRadioButton("File");
-    QRadioButton *folderRadioButton = new QRadioButton("Folder");
+    fileRadioButton = new QRadioButton("File");
+    folderRadioButton = new QRadioButton("Folder");
     fileRadioButton->setChecked(true); // Default to File mode
-    QButtonGroup *modeButtonGroup = new QButtonGroup();
+
+    modeButtonGroup = new QButtonGroup();
     modeButtonGroup->addButton(fileRadioButton);
     modeButtonGroup->addButton(folderRadioButton);
 
@@ -68,116 +53,75 @@ int main(int argc, char *argv[]) {
     modeLayout->addWidget(fileRadioButton);
     modeLayout->addWidget(folderRadioButton);
 
-    QLabel *inputLabel = new QLabel("Input:");
-    QLineEdit *inputLineEdit = new QLineEdit();
-    QPushButton *browseInputButton = new QPushButton("Browse...");
+    return modeWidget;
+}
 
-    QLabel *outputLabel = new QLabel("Output:");
-    QLineEdit *outputLineEdit = new QLineEdit();
-    QPushButton *browseOutputButton = new QPushButton("Browse...");
+// Function to create input and output layout
+QHBoxLayout* createInputOutputLayout(const QString &labelText, QLineEdit* &lineEdit, QPushButton* &browseButton) {
+    QLabel *label = new QLabel(labelText);
+    lineEdit = new QLineEdit();
+    browseButton = new QPushButton("Browse...");
 
-    QObject::connect(browseInputButton, &QPushButton::clicked, [&]() {
+    QHBoxLayout *layout = new QHBoxLayout();
+    layout->addWidget(label);
+    layout->addWidget(lineEdit);
+    layout->addWidget(browseButton);
+
+    return layout;
+}
+
+// Function to handle file selection
+void connectFileSelectors(QPushButton* browseInputButton, QPushButton* browseOutputButton, QLineEdit* inputLineEdit, QLineEdit* outputLineEdit, QRadioButton* compressRadioButton, QRadioButton* fileRadioButton, QWidget* window) {
+    QObject::connect(browseInputButton, &QPushButton::clicked, [=]() {
         if (compressRadioButton->isChecked()) { // Compression mode
             if (fileRadioButton->isChecked()) {
-                QString fileName = QFileDialog::getOpenFileName(&window, "Select Input File", "", "All Files (*)");
+                QString fileName = QFileDialog::getOpenFileName(window, "Select Input File", "", "All Files (*)");
                 if (!fileName.isEmpty()) {
                     inputLineEdit->setText(fileName);
                 }
             } else {
-                QString directory = QFileDialog::getExistingDirectory(&window, "Select Input Directory");
+                QString directory = QFileDialog::getExistingDirectory(window, "Select Input Directory");
                 if (!directory.isEmpty()) {
                     inputLineEdit->setText(directory);
                 }
             }
         } else { // Decompression mode
-            QString fileName = QFileDialog::getOpenFileName(&window, "Select Input Archive", "", "Compressed Files (*.myarch);;All Files (*)");
+            QString fileName = QFileDialog::getOpenFileName(window, "Select Input Archive", "", "Compressed Files (*.myarch);;All Files (*)");
             if (!fileName.isEmpty()) {
                 inputLineEdit->setText(fileName);
             }
         }
     });
 
-    QObject::connect(browseOutputButton, &QPushButton::clicked, [&]() {
+    QObject::connect(browseOutputButton, &QPushButton::clicked, [=]() {
         if (compressRadioButton->isChecked()) { // Compression mode
-            QString fileName = QFileDialog::getSaveFileName(&window, "Select Output Archive", "", "Compressed Files (*.myarch);;All Files (*)");
+            QString fileName = QFileDialog::getSaveFileName(window, "Select Output Archive", "", "Compressed Files (*.myarch);;All Files (*)");
             if (!fileName.isEmpty()) {
                 outputLineEdit->setText(fileName);
             }
         } else { // Decompression mode
-            QString directory = QFileDialog::getExistingDirectory(&window, "Select Output Directory");
+            QString directory = QFileDialog::getExistingDirectory(window, "Select Output Directory");
             if (!directory.isEmpty()) {
                 outputLineEdit->setText(directory);
             }
         }
     });
+}
 
-    QProgressBar *progressBar = new QProgressBar();
-    progressBar->setRange(0, 100);
-
-    QLabel *statusLabel = new QLabel();
-    statusLabel->setAlignment(Qt::AlignCenter);
-    statusLabel->setStyleSheet("font-size: 16px; color: green;");
-
-    // Layout adjustments
-    QVBoxLayout *layout = new QVBoxLayout(&window);
-    layout->setSpacing(20);
-    layout->setContentsMargins(20, 20, 20, 20);
-
-    // Operation selection layout
-    layout->addLayout(operationLayout);
-
-    // Mode selection layout (only for Compression mode)
-    layout->addWidget(modeWidget);
-
-    QHBoxLayout *inputLayout = new QHBoxLayout();
-    inputLayout->addWidget(inputLabel);
-    inputLayout->addWidget(inputLineEdit);
-    inputLayout->addWidget(browseInputButton);
-
-    QHBoxLayout *outputLayout = new QHBoxLayout();
-    outputLayout->addWidget(outputLabel);
-    outputLayout->addWidget(outputLineEdit);
-    outputLayout->addWidget(browseOutputButton);
-
-    layout->addLayout(inputLayout);
-    layout->addLayout(outputLayout);
-
-    // Progress bar and status label
-    layout->addWidget(progressBar);
-    layout->addWidget(statusLabel);
-
-    // Buttons layout
-    QHBoxLayout *buttonsLayout = new QHBoxLayout();
-    buttonsLayout->addWidget(compressButton);
-    buttonsLayout->addWidget(decompressButton);
-
-    layout->addLayout(buttonsLayout);
-
-    // Adjust visibility of modeWidget based on operation
-    QObject::connect(compressRadioButton, &QRadioButton::toggled, [&](bool checked){
-        modeWidget->setVisible(checked); // Show modeWidget only in Compression mode
-        compressButton->setEnabled(checked);
-        decompressButton->setEnabled(!checked);
-    });
-
-    // Initially set visibility and button states
-    modeWidget->setVisible(compressRadioButton->isChecked());
-    compressButton->setEnabled(compressRadioButton->isChecked());
-    decompressButton->setEnabled(decompressRadioButton->isChecked());
-
-    // Operation logic
-    auto operationHandler = [&]() {
+// Function to handle operation logic
+void connectOperationButtons(QPushButton* compressButton, QPushButton* decompressButton, QProgressBar* progressBar, QLabel* statusLabel, QRadioButton* compressRadioButton, QRadioButton* fileRadioButton, QLineEdit* inputLineEdit, QLineEdit* outputLineEdit, QWidget* window) {
+    auto operationHandler = [=]() {
         bool isCompression = compressRadioButton->isChecked();
         QString inputPath = inputLineEdit->text();
         QString outputPath = outputLineEdit->text();
 
         if (inputPath.isEmpty()) {
-            QMessageBox::warning(&window, "Input", "Please select an input " + QString(isCompression ? (fileRadioButton->isChecked() ? "file." : "directory.") : "archive file."));
+            QMessageBox::warning(window, "Input", "Please select an input " + QString(isCompression ? (fileRadioButton->isChecked() ? "file." : "directory.") : "archive file."));
             return;
         }
 
         if (outputPath.isEmpty()) {
-            QMessageBox::warning(&window, "Output", "Please specify an output " + QString(isCompression ? "archive file." : "directory."));
+            QMessageBox::warning(window, "Output", "Please specify an output " + QString(isCompression ? "archive file." : "directory."));
             return;
         }
 
@@ -185,43 +129,34 @@ int main(int argc, char *argv[]) {
         QFileInfo outputInfo(outputPath);
 
         if (isCompression) {
-            if (fileRadioButton->isChecked()) {
-                if (!inputInfo.isFile()) {
-                    QMessageBox::warning(&window, "Input", "Please select a valid input file.");
-                    return;
-                }
-            } else {
-                if (!inputInfo.isDir()) {
-                    QMessageBox::warning(&window, "Input", "Please select a valid input directory.");
-                    return;
-                }
+            if (fileRadioButton->isChecked() && !inputInfo.isFile()) {
+                QMessageBox::warning(window, "Input", "Please select a valid input file.");
+                return;
+            } else if (!fileRadioButton->isChecked() && !inputInfo.isDir()) {
+                QMessageBox::warning(window, "Input", "Please select a valid input directory.");
+                return;
             }
-            // Output should be a file path (may not exist yet)
             if (outputInfo.exists() && outputInfo.isDir()) {
-                QMessageBox::warning(&window, "Output", "Please specify a valid output archive file path.");
+                QMessageBox::warning(window, "Output", "Please specify a valid output archive file path.");
                 return;
             }
         } else {
-            // Decompression mode
             if (!inputInfo.isFile()) {
-                QMessageBox::warning(&window, "Input", "Please select a valid input archive file.");
+                QMessageBox::warning(window, "Input", "Please select a valid input archive file.");
                 return;
             }
-            // Output should be a directory (may not exist yet)
             if (outputInfo.exists() && !outputInfo.isDir()) {
-                QMessageBox::warning(&window, "Output", "Please specify a valid output directory path.");
+                QMessageBox::warning(window, "Output", "Please specify a valid output directory path.");
                 return;
             }
         }
 
-        // Disable buttons to prevent multiple clicks
         compressButton->setEnabled(false);
         decompressButton->setEnabled(false);
         progressBar->setValue(0);
         statusLabel->setStyleSheet("font-size: 16px; color: blue;");
         statusLabel->setText(isCompression ? "Compressing..." : "Decompressing...");
 
-        // Create a new thread
         QThread *thread = new QThread();
 
         if (isCompression) {
@@ -231,7 +166,7 @@ int main(int argc, char *argv[]) {
             QObject::connect(thread, &QThread::started, compressor, &CompressorWorker::process);
             QObject::connect(compressor, &CompressorWorker::progress, progressBar, &QProgressBar::setValue);
 
-            QObject::connect(compressor, &CompressorWorker::finished, &window, [=]() {
+            QObject::connect(compressor, &CompressorWorker::finished, window, [=]() {
                 compressButton->setEnabled(true);
                 decompressButton->setEnabled(true);
                 progressBar->setValue(100);
@@ -239,7 +174,7 @@ int main(int argc, char *argv[]) {
                 statusLabel->setText("Compression completed successfully.");
                 thread->quit();
             });
-            QObject::connect(compressor, &CompressorWorker::error, &window, [=](const QString &message) {
+            QObject::connect(compressor, &CompressorWorker::error, window, [=](const QString &message) {
                 compressButton->setEnabled(true);
                 decompressButton->setEnabled(true);
                 statusLabel->setStyleSheet("font-size: 16px; color: red;");
@@ -258,7 +193,7 @@ int main(int argc, char *argv[]) {
             QObject::connect(thread, &QThread::started, decompressor, &DecompressWorker::process);
             QObject::connect(decompressor, &DecompressWorker::progress, progressBar, &QProgressBar::setValue);
 
-            QObject::connect(decompressor, &DecompressWorker::finished, &window, [=]() {
+            QObject::connect(decompressor, &DecompressWorker::finished, window, [=]() {
                 compressButton->setEnabled(true);
                 decompressButton->setEnabled(true);
                 progressBar->setValue(100);
@@ -266,7 +201,7 @@ int main(int argc, char *argv[]) {
                 statusLabel->setText("Decompression completed successfully.");
                 thread->quit();
             });
-            QObject::connect(decompressor, &DecompressWorker::error, &window, [=](const QString &message) {
+            QObject::connect(decompressor, &DecompressWorker::error, window, [=](const QString &message) {
                 compressButton->setEnabled(true);
                 decompressButton->setEnabled(true);
                 statusLabel->setStyleSheet("font-size: 16px; color: red;");
@@ -283,8 +218,80 @@ int main(int argc, char *argv[]) {
 
     QObject::connect(compressButton, &QPushButton::clicked, operationHandler);
     QObject::connect(decompressButton, &QPushButton::clicked, operationHandler);
+}
+
+int main(int argc, char *argv[]) {
+    QApplication app(argc, argv);
+
+    QWidget window;
+    window.setWindowTitle("LZ77 Compressor/Decompressor");
+    window.resize(700, 1000);
+
+    app.setStyleSheet(
+        "QPushButton { background-color: #8A2BE2; color: white; font-size: 16px; }"
+        "QPushButton:disabled { background-color: #CCCCCC; }"
+        "QLabel { font-size: 14px; }"
+        "QLineEdit { font-size: 14px; }"
+        "QProgressBar { height: 20px; }"
+        );
+    window.setWindowIcon(QIcon(":/resources/icon.png"));
+
+    QRadioButton *compressRadioButton, *decompressRadioButton, *fileRadioButton, *folderRadioButton;
+    QButtonGroup *operationButtonGroup, *modeButtonGroup;
+
+    QVBoxLayout *layout = new QVBoxLayout(&window);
+    layout->setSpacing(10); // Reduced vertical spacing
+    layout->setContentsMargins(30, 30, 30, 30); // Adjust margins
+
+    QHBoxLayout *operationLayout = createOperationLayout(operationButtonGroup, compressRadioButton, decompressRadioButton);
+    layout->addLayout(operationLayout);
+    layout->setAlignment(operationLayout, Qt::AlignCenter);
+
+    QWidget *modeWidget = createModeWidget(modeButtonGroup, fileRadioButton, folderRadioButton);
+    layout->addWidget(modeWidget);
+    layout->setAlignment(modeWidget, Qt::AlignCenter);
+
+    QLineEdit *inputLineEdit, *outputLineEdit;
+    QPushButton *browseInputButton, *browseOutputButton;
+    QHBoxLayout *inputLayout = createInputOutputLayout("Input:", inputLineEdit, browseInputButton);
+    QHBoxLayout *outputLayout = createInputOutputLayout("Output:", outputLineEdit, browseOutputButton);
+    layout->addLayout(inputLayout);
+    layout->setAlignment(inputLayout, Qt::AlignCenter);
+    layout->addLayout(outputLayout);
+    layout->setAlignment(outputLayout, Qt::AlignCenter);
+
+    QProgressBar *progressBar = new QProgressBar();
+    progressBar->setRange(0, 100);
+    QLabel *statusLabel = new QLabel();
+    statusLabel->setAlignment(Qt::AlignCenter);
+    statusLabel->setStyleSheet("font-size: 16px; color: green;");
+
+    layout->addWidget(progressBar);
+    layout->setAlignment(progressBar, Qt::AlignCenter);
+    layout->addWidget(statusLabel);
+    layout->setAlignment(statusLabel, Qt::AlignCenter);
+
+    QPushButton *compressButton = new QPushButton("Compress");
+    QPushButton *decompressButton = new QPushButton("Decompress");
+    QHBoxLayout *buttonsLayout = new QHBoxLayout();
+    buttonsLayout->addWidget(compressButton);
+    buttonsLayout->addWidget(decompressButton);
+    layout->addLayout(buttonsLayout);
+    layout->setAlignment(buttonsLayout, Qt::AlignCenter);
+
+    connectFileSelectors(browseInputButton, browseOutputButton, inputLineEdit, outputLineEdit, compressRadioButton, fileRadioButton, &window);
+    connectOperationButtons(compressButton, decompressButton, progressBar, statusLabel, compressRadioButton, fileRadioButton, inputLineEdit, outputLineEdit, &window);
+
+    QObject::connect(compressRadioButton, &QRadioButton::toggled, [&](bool checked){
+        modeWidget->setVisible(checked);
+        compressButton->setEnabled(checked);
+        decompressButton->setEnabled(!checked);
+    });
+
+    modeWidget->setVisible(compressRadioButton->isChecked());
+    compressButton->setEnabled(compressRadioButton->isChecked());
+    decompressButton->setEnabled(decompressRadioButton->isChecked());
 
     window.show();
-
     return app.exec();
 }
